@@ -95,8 +95,7 @@ def verified_copy_file(src,
 
 # ----------------------------------------------------------------------------------------------------------------------
 def copy_and_add_ver_num(source_p,
-                         dest_d,
-                         dest_n=None,
+                         dest_p,
                          ver_prefix="v",
                          num_digits=4,
                          do_verified_copy=False):
@@ -107,11 +106,8 @@ def copy_and_add_ver_num(source_p,
 
     :param source_p:
             The full path to the file to copy.
-    :param dest_d:
-            The directory to copy to.
-    :param dest_n:
-            An optional name to rename the copied file to. If None, then the copied file will have the same name as the
-            source file. Defaults to None.
+    :param dest_p:
+            The full path to the destination file (path plus name to copy to).
     :param ver_prefix:
             The prefix to put onto the version number. For example, if the prefix is "v", then the version number will
             be represented as "v####". Defaults to "v".
@@ -126,15 +122,12 @@ def copy_and_add_ver_num(source_p,
     """
 
     assert type(source_p) is str
-    assert type(dest_d) is str
-    assert dest_n is None or type(dest_n) is str
+    assert type(dest_p) is str
     assert type(ver_prefix) is str
     assert type(num_digits) is int
     assert type(do_verified_copy) is bool
 
-    if not dest_n:
-        source_d, dest_n = os.path.split(source_p)
-
+    dest_d, dest_n = os.path.split(dest_p)
     base, ext = os.path.splitext(dest_n)
 
     v = 1
@@ -157,10 +150,9 @@ def copy_and_add_ver_num(source_p,
 
 # ----------------------------------------------------------------------------------------------------------------------
 # TODO: Make windows safe
-def copy_files_deduplicated(sources_p,
-                            dest_d,
+def copy_files_deduplicated(dest_d,
                             data_d,
-                            dest_n=None,
+                            sources_p,
                             ver_prefix="v",
                             num_digits=4,
                             do_verified_copy=False):
@@ -169,19 +161,34 @@ def copy_files_deduplicated(sources_p,
     to this file. Does de-duplication so that if more than one file (regardless of when copied or name) contains the
     same data, it will only be stored in data_d once.
 
-    :param sources_p:
-            The path to the source files being stored. Accepts a list of files or a single file (as a string). No
-            directories or symlinks.
     :param dest_d:
-            The full path of the directory where the file will appear to be stored. In actual fact this will really
-            become a symlink to the actual file which will be stored in data_d. dest_d may not be a subdirectory of
-            data_d.
+            The full path of the root directory where the files given by sources_p will appear to be copied (they will
+            appear to be copied to subdirectories of dest_d). They only appear to be copied to subdirectories of dest_d
+            because in actual fact they are copied to data_d, and a symlink to these copied files will be copied to a
+            subdirectory of dest_d. dest_d may not be a subdirectory of data_d. See sources_p below for an example of
+            how this works.
     :param data_d:
             The directory where the actual files will be stored.
-    :param dest_n:
-            An optional name to rename the copied file to. If None, then the copied file will have the same name as the
-            source file. Only to be used if the passed sources_p is either a string or a list of length 1. If either of
-            these is not the case, and dest_n is NOT None, an assertion error is raised. Defaults to None.
+    :param sources_p:
+            A dictionary where the key is the path of the file to be copied, and the value is a relative path (from
+            dest_d) where the file will be stored plus the destination file name.
+
+            For example:
+
+            If dest_d is:
+                /path/to/destination/directory
+
+            and data_d is:
+                /path/to/data/directory
+
+            and sources_p is:
+                {"/another/path/to/a/source/file.txt": "relative/dir/new_file_name.txt"}
+
+            Then the file will (appear) to be copied to:
+                /path/to/destination/directory/relative/dir/new_file_name.txt
+
+            (in actual fact, the above file will be a symlink that points to something similar to):
+                /path/to/data/directory/new_file_name.v001.txt
     :param ver_prefix:
             The prefix to put onto the version number used inside the data_d dir to de-duplicate files. This version
             number is NOT added to the symlink file so, as far as the end user is concerned, the version number does not
@@ -198,14 +205,9 @@ def copy_files_deduplicated(sources_p,
             passed in as a source, then a list of paths to de-duplicated files will be returned instead.
     """
 
-    if dest_n is not None:
-        assert type(sources_p) is str or (type(sources_p) is list and len(sources_p) is 1)
-    else:
-        assert type(sources_p) is str or type(sources_p) is list
-
     assert type(dest_d) is str
     assert type(data_d) is str
-    assert dest_n is None or type(dest_n) is str
+    assert type(sources_p) is dict
     assert type(ver_prefix) is str
     assert type(num_digits) is int
     assert type(do_verified_copy) is bool
@@ -213,10 +215,7 @@ def copy_files_deduplicated(sources_p,
     if dest_d.startswith(data_d):
         raise ValueError("Destination directory may not be a child of the data directory")
 
-    if type(sources_p) is not list:
-        sources_p = [sources_p]
-
-    for source_p in sources_p:
+    for source_p in sources_p.keys():
 
         if not os.path.exists(source_p):
             raise ValueError(f"CopyDeduplicated failed: source file does not exist: {source_p}")
@@ -226,18 +225,14 @@ def copy_files_deduplicated(sources_p,
     output = list()
 
     data_sizes = bvzfilesystemlib.dir_files_keyed_by_size(data_d)
-    cached_md5 = dict()
+    cached_md5 = dict()  # cache each md5 checksum to avoid potentially re-doing the checksum multiple times in the loop
 
-    for source_p in sources_p:
+    for source_p, dest_relative_p in sources_p.items():
 
+        dest_n = os.path.split(dest_relative_p)[1]
         size = os.path.getsize(source_p)
 
-        if not dest_n:
-            destination_name = os.path.split(source_p)[1]
-        else:
-            destination_name = dest_n
-
-        # Check to see if there is a list of files of that size in the .data dir
+        # Check to see if there are any files of that size in the .data dir
         try:
             possible_matches_p = data_sizes[size]
         except KeyError:
@@ -251,18 +246,17 @@ def copy_files_deduplicated(sources_p,
                 possible_match_md5 = cached_md5[possible_match_p]
             except KeyError:
                 possible_match_md5 = md5_for_file(possible_match_p)
-                cached_md5[possible_match_p] = possible_match_md5
+                cached_md5[possible_match_p] = possible_match_md5  # cache in case we see this file again in the loop
             if source_md5 == possible_match_md5:
                 matched_p = possible_match_p
                 break
 
-        # If we did not find a matching file, then copy the file to the
-        # data_d dir, with an added version number that ensures that we do
-        # not overwrite any previous versions of files with the same name.
+        # If we did not find a matching file, then copy the file to the data_d dir, with an added version number that
+        # ensures that we do not overwrite any previous versions of files with the same name.
         if matched_p is None:
+
             matched_p = copy_and_add_ver_num(source_p=source_p,
-                                             dest_d=data_d,
-                                             dest_n=destination_name,
+                                             dest_p=os.path.join(data_d, dest_n),
                                              ver_prefix=ver_prefix,
                                              num_digits=num_digits,
                                              do_verified_copy=do_verified_copy)
@@ -275,9 +269,9 @@ def copy_files_deduplicated(sources_p,
         matched_file_n = os.path.split(matched_p.rstrip(os.path.sep))[1]
         relative_d = os.path.relpath(data_d, dest_d)
         relative_p = os.path.join(relative_d, matched_file_n)
-        if os.path.exists(os.path.join(dest_d, destination_name)):
-            os.unlink(os.path.join(dest_d, destination_name))
-        os.symlink(relative_p, os.path.join(dest_d, destination_name))
+        if os.path.exists(os.path.join(dest_d, dest_n)):
+            os.unlink(os.path.join(dest_d, dest_n))
+        os.symlink(relative_p, os.path.join(dest_d, dest_n))
 
         bvzfilesystemlib.add_file_to_dict_by_size(source_p, data_sizes)
 
