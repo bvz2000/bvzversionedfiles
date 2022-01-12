@@ -5,17 +5,19 @@ import shutil
 import bvzfilesystemlib
 
 
-# ------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 def md5_for_file(file_p,
                  block_size=2**20):
     """
-    Create an md5 checksum for a file without reading the whole file in in a
-    single chunk.
+    Create an md5 checksum for a file without reading the whole file in a single chunk.
 
-    :param file_p: The path to the file we are checksumming.
-    :param block_size: How much to read in in a single chunk. Defaults to 1MB
+    :param file_p:
+            The path to the file we are check-summing.
+    :param block_size:
+            How much to read in a single chunk. Defaults to 1 MB
 
-    :return: The md5 checksum.
+    :return:
+            The md5 checksum.
     """
 
     assert os.path.exists(file_p)
@@ -32,22 +34,24 @@ def md5_for_file(file_p,
     return md5.digest()
 
 
-# ------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 def files_are_identical(file_a_p,
                         file_b_p,
                         block_size=2**20):
     """
-    Compares two files to see if they are identical. First compares sizes. If
-    the sizes match, then it does an md5 checksum on the files to see if they
-    match. Ignores all metadata when comparing (name, creation or modification
+    Compares two files to see if they are identical. First compares sizes. If the sizes match, then it does an md5
+    checksum on the files to see if they match. Ignores all metadata when comparing (name, creation or modification
     dates, etc.) Returns True if they match, False otherwise.
 
-    :param file_a_p: The path to the first file we are comparing.
-    :param file_b_p: The path to the second file we are comparing
-    :param block_size: How much to read in in a single chunk when doing the md5
-           checksum. Defaults to 1MB
+    :param file_a_p:
+            The path to the first file we are comparing.
+    :param file_b_p:
+            The path to the second file we are comparing
+    :param block_size:
+            How much to read in a single chunk when doing the md5 checksum. Defaults to 1 MB
 
-    :return: True if the files match, False otherwise.
+    :return:
+            True if the files match, False otherwise.
     """
 
     assert os.path.exists(file_a_p)
@@ -63,21 +67,21 @@ def files_are_identical(file_a_p,
     return False
 
 
-# ------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 def verified_copy_file(src,
                        dst):
     """
-    Given a source file and a destination, copies the file, and then checksum's
-    both files to ensure that the copy matches the source. Raises an error if
-    the copied file's md5 checksum does not match the source file's md5
-    checksum.
+    Given a source file and a destination, copies the file, and then checksum's both files to ensure that the copy
+    matches the source. Raises an error if the copied file's md5 checksum does not match the source file's md5 checksum.
 
-    :param src: The source file to be copied.
-    :param dst: The destination file name where the file will be copied. If the
-           destination file already exists, an error will be raised. You must
-           supply the destination file name, not just the destination dir.
+    :param src:
+            The source file to be copied.
+    :param dst:
+            The destination file name where the file will be copied. If the destination file already exists, an error
+            will be raised. You must supply the destination file name, not just the destination dir.
 
-    :return: Nothing.
+    :return:
+            Nothing.
     """
 
     assert os.path.exists(src)
@@ -92,7 +96,7 @@ def verified_copy_file(src,
         raise IOError(msg + src + " --> " + dst)
 
 
-# ------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 def copy_and_add_ver_num(source_p,
                          dest_d,
                          dest_n=None,
@@ -100,26 +104,28 @@ def copy_and_add_ver_num(source_p,
                          num_digits=4,
                          do_verified_copy=False):
     """
-    Copies a source file to the dest dir, adding a version number to the file
-    right before the extension. If a file with that version number already
-    exists, the file being copied will have its version number incremented so as
-    not to overwrite.  Returns a full path to the file that was copied.
+    Copies a source file to the dest dir, adding a version number to the file right before the extension. If a file with
+    that version number already exists, the file being copied will have its version number incremented so as not to
+    overwrite. Returns a full path to the file that was copied.
 
-    :param source_p: The full path to the file to copy.
-    :param dest_d: The directory to copy to.
-    :param dest_n: An optional name to rename the copied file to. If None, then
-           the copied file will have the same name as the source file. Defaults
-           to None.
-    :param ver_prefix: The prefix to put onto the version number. For example,
-           if the prefix is "v", then the version number will be represented as
-           "v####". Defaults to "v".
-    :param num_digits: How much padding to use for the version numbers. For
-           example, 4 would lead to versions like: v0001 whereas 3 would lead to
-           versions like: v001. Defaults to 4.
-    :param do_verified_copy: If True, then a verified copy will be performed.
-           Defaults to False.
+    :param source_p:
+            The full path to the file to copy.
+    :param dest_d:
+            The directory to copy to.
+    :param dest_n:
+            An optional name to rename the copied file to. If None, then the copied file will have the same name as the
+            source file. Defaults to None.
+    :param ver_prefix:
+            The prefix to put onto the version number. For example, if the prefix is "v", then the version number will
+            be represented as "v####". Defaults to "v".
+    :param num_digits:
+            How much padding to use for the version numbers. For example, 4 would lead to versions like: v0001 whereas 3
+            would lead to versions like: v001. Defaults to 4.
+    :param do_verified_copy:
+            If True, then a verified copy will be performed. Defaults to False.
 
-    :return: A full path to the file that was copied.
+    :return:
+            A full path to the file that was copied.
     """
 
     assert os.path.exists(source_p)
