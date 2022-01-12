@@ -20,7 +20,7 @@ def md5_for_file(file_p,
             The md5 checksum.
     """
 
-    assert os.path.exists(file_p)
+    assert type(file_p) is str
     assert type(block_size) is int
 
     md5 = hashlib.md5()
@@ -54,10 +54,9 @@ def files_are_identical(file_a_p,
             True if the files match, False otherwise.
     """
 
-    assert os.path.exists(file_a_p)
-    assert os.path.isfile(file_a_p)
-    assert os.path.exists(file_b_p)
-    assert os.path.isfile(file_b_p)
+    assert type(file_a_p) is str
+    assert type(file_b_p) is str
+    assert type(block_size) is int
 
     if os.path.getsize(file_a_p) == os.path.getsize(file_b_p):
         md5_a = md5_for_file(file_a_p, block_size)
@@ -84,10 +83,8 @@ def verified_copy_file(src,
             Nothing.
     """
 
-    assert os.path.exists(src)
-    assert os.path.isfile(src)
-    assert os.path.exists(os.path.split(dst)[0])
-    assert os.path.isdir(os.path.split(dst)[0])
+    assert type(src) is str
+    assert type(dst) is str
 
     shutil.copy(src, dst)
 
@@ -128,10 +125,10 @@ def copy_and_add_ver_num(source_p,
             A full path to the file that was copied.
     """
 
-    assert os.path.exists(source_p)
-    assert os.path.isfile(source_p)
-    assert os.path.exists(dest_d)
-    assert os.path.isdir(dest_d)
+    assert type(source_p) is str
+    assert type(dest_d) is str
+    assert dest_n is None or type(dest_n) is str
+    assert type(ver_prefix) is str
     assert type(num_digits) is int
     assert type(do_verified_copy) is bool
 
@@ -146,7 +143,6 @@ def copy_and_add_ver_num(source_p,
         version = "." + ver_prefix + str(v).rjust(num_digits, "0")
         dest_p = os.path.join(dest_d, base + version + ext)
 
-        # This is not race condition safe, but it works for most cases...
         if os.path.exists(dest_p):
             v += 1
             continue
@@ -160,6 +156,7 @@ def copy_and_add_ver_num(source_p,
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+# TODO: Make windows safe
 def copy_files_deduplicated(sources_p,
                             dest_d,
                             data_d,
@@ -173,10 +170,11 @@ def copy_files_deduplicated(sources_p,
     same data, it will only be stored in data_d once.
 
     :param sources_p:
-            The path to the source files being stored. Accepts a list of files or a single file (as a string).
+            The path to the source files being stored. Accepts a list of files or a single file (as a string). No
+            directories or symlinks.
     :param dest_d:
             The full path of the directory where the file will appear to be stored. In actual fact this will really
-            become a symlink to the actual file which will be stored in data_d. dest_d may not be a sub-directory of
+            become a symlink to the actual file which will be stored in data_d. dest_d may not be a subdirectory of
             data_d.
     :param data_d:
             The directory where the actual files will be stored.
@@ -185,7 +183,7 @@ def copy_files_deduplicated(sources_p,
             source file. Only to be used if the passed sources_p is either a string or a list of length 1. If either of
             these is not the case, and dest_n is NOT None, an assertion error is raised. Defaults to None.
     :param ver_prefix:
-            The prefix to put onto the version number used inside of the data_d dir to de-duplicate files. This version
+            The prefix to put onto the version number used inside the data_d dir to de-duplicate files. This version
             number is NOT added to the symlink file so, as far as the end user is concerned, the version number does not
             exist. For example, if the prefix is "v", then the version number will be represented as "v####". Defaults
             to "v".
@@ -200,15 +198,17 @@ def copy_files_deduplicated(sources_p,
             passed in as a source, then a list of paths to de-duplicated files will be returned instead.
     """
 
-    assert not dest_d.startswith(data_d)
-    assert os.path.exists(data_d)
-    assert os.path.isdir(data_d)
-    assert os.path.exists(dest_d)
-    assert os.path.isdir(dest_d)
-    assert type(num_digits) is int
-    assert type(do_verified_copy) is bool
     if dest_n is not None:
         assert type(sources_p) is str or (type(sources_p) is list and len(sources_p) is 1)
+    else:
+        assert type(sources_p) is str or type(sources_p) is list
+
+    assert type(dest_d) is str
+    assert type(data_d) is str
+    assert dest_n is None or type(dest_n) is str
+    assert type(ver_prefix) is str
+    assert type(num_digits) is int
+    assert type(do_verified_copy) is bool
 
     if dest_d.startswith(data_d):
         raise ValueError("Destination directory may not be a child of the data directory")
@@ -218,8 +218,10 @@ def copy_files_deduplicated(sources_p,
 
     for source_p in sources_p:
 
-        assert os.path.exists(source_p)
-        assert os.path.isfile(source_p)
+        if not os.path.exists(source_p):
+            raise ValueError(f"CopyDeduplicated failed: source file does not exist: {source_p}")
+        if not os.path.isfile(source_p):
+            raise ValueError(f"CopyDeduplicated failed: source file is not a file: {source_p}")
 
     output = list()
 
