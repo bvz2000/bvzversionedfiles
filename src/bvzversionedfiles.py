@@ -149,9 +149,9 @@ def copy_and_add_ver_num(source_p,
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-def copy_files_deduplicated(dest_d,
+def copy_files_deduplicated(sources,
+                            dest_d,
                             data_d,
-                            sources_p,
                             ver_prefix="v",
                             num_digits=4,
                             do_verified_copy=False):
@@ -162,14 +162,15 @@ def copy_files_deduplicated(dest_d,
 
     For example:
 
-    If dest_d is:
+
+    If sources_p is:
+        {"/another/path/to/a/source/file.txt": "relative/dir/new_file_name.txt"}
+
+    and dest_d is:
         /path/to/destination/directory
 
     and data_d is:
         /path/to/data/directory
-
-    and sources_p is:
-        {"/another/path/to/a/source/file.txt": "relative/dir/new_file_name.txt"}
 
     Then the file will (appear) to be copied to:
         /path/to/destination/directory/relative/dir/new_file_name.txt
@@ -177,17 +178,16 @@ def copy_files_deduplicated(dest_d,
     but in actual fact, the above file will be a symlink that points to:
         /path/to/data/directory/new_file_name.v001.txt
 
+    :param sources:
+            A dictionary where the key is the path of the file to be copied, and the value is the relative path plus the
+            destination file name where the file will be stored (relative from dest_d).
     :param dest_d:
             The full path of the root directory where the files given by sources_p will appear to be copied (they will
             appear to be copied to subdirectories of this directory, based on the relative paths given in sources_p).
             They only "appear" to be copied to these locations because in actual fact they are symlinks to the actual
-            file which is copied into data_d. See the description the sources_p argument below for an example of
-            how this works.
+            file which is copied into data_d.
     :param data_d:
             The directory where the actual files will be stored.
-    :param sources_p:
-            A dictionary where the key is the path of the file to be copied, and the value is a relative path (from
-            dest_d) where the file will be stored plus the destination file name.
     :param ver_prefix:
             The prefix to put onto the version number used inside the data_d dir to de-duplicate files. This version
             number is NOT added to the symlink file so, as far as the end user is concerned, the version number does not
@@ -206,7 +206,7 @@ def copy_files_deduplicated(dest_d,
 
     assert type(dest_d) is str
     assert type(data_d) is str
-    assert type(sources_p) is dict
+    assert type(sources) is dict
     assert type(ver_prefix) is str
     assert type(num_digits) is int
     assert type(do_verified_copy) is bool
@@ -214,7 +214,7 @@ def copy_files_deduplicated(dest_d,
     if dest_d.startswith(data_d):
         raise ValueError("Destination directory may not be a child of the data directory")
 
-    for source_p in sources_p.keys():
+    for source_p in sources.keys():
 
         if not os.path.exists(source_p):
             raise ValueError(f"CopyDeduplicated failed: source file does not exist: {source_p}")
@@ -226,7 +226,7 @@ def copy_files_deduplicated(dest_d,
     data_sizes = bvzfilesystemlib.dir_files_keyed_by_size(data_d)
     cached_md5 = dict()  # cache each md5 checksum to avoid potentially re-doing the checksum multiple times in the loop
 
-    for source_p, dest_relative_p in sources_p.items():
+    for source_p, dest_relative_p in sources.items():
 
         output[source_p] = (copy_file_deduplicated(source_p=source_p,
                                                    dest_p=os.path.join(dest_d, dest_relative_p),
