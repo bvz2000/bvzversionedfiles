@@ -149,7 +149,7 @@ def copy_and_add_ver_num(source_p,
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-def copy_files_deduplicated(sources,
+def copy_files_deduplicated(copydescriptors,
                             dest_d,
                             data_d,
                             ver_prefix="v",
@@ -158,13 +158,15 @@ def copy_files_deduplicated(sources,
     """
     Given a list of source files, copy those files into the data directory and make a symlink in dest_p that points
     to these files. Does de-duplication so that if more than one file (regardless of when copied or name) contains the
-    same data, it will only be stored in data_d once.
+    same data, it will only be stored in data_d once. If the copydescriptor has link_in_place set to True, then the
+    file will not be copied to data_d, and the symlink in dest_p will point to the original source file.
 
-    For example:
+    Example #1:
 
-
-    If sources_p is:
-        {"/another/path/to/a/source/file.txt": "relative/dir/new_file_name.txt"}
+    If the copydescriptor is:
+        source_p = "/another/path/to/a/source/file.txt"
+        dest_relative_p = "relative/dir/new_file_name.txt"
+        link_in_place = False
 
     and dest_d is:
         /path/to/destination/directory
@@ -178,7 +180,23 @@ def copy_files_deduplicated(sources,
     but in actual fact, the above file will be a symlink that points to:
         /path/to/data/directory/new_file_name.v001.txt
 
-    :param sources:
+    Example #2:
+
+    If the copydescriptor is:
+        source_p = "/another/path/to/a/source/file.txt"
+        dest_relative_p = None
+        link_in_place = True
+
+    and dest_d is:
+        /path/to/destination/directory
+
+    Then the file will (appear) to be copied to:
+        /path/to/destination/directory/relative/dir/new_file_name.txt
+
+    but in actual fact, the above file will be a symlink that points to the original source file:
+        /another/path/to/a/source/file.txt
+
+    :param copydescriptors:
             A dictionary where the key is the path of the file to be copied, and the value is the relative path plus the
             destination file name where the file will be stored (relative from dest_d).
     :param dest_d:
@@ -206,7 +224,7 @@ def copy_files_deduplicated(sources,
 
     assert type(dest_d) is str
     assert type(data_d) is str
-    assert type(sources) is dict
+    assert type(copydescriptors) is dict
     assert type(ver_prefix) is str
     assert type(num_digits) is int
     assert type(do_verified_copy) is bool
@@ -214,7 +232,7 @@ def copy_files_deduplicated(sources,
     if dest_d.startswith(data_d):
         raise ValueError("Destination directory may not be a child of the data directory")
 
-    for source_p in sources.keys():
+    for source_p in copydescriptors.keys():
 
         if not os.path.exists(source_p):
             raise ValueError(f"CopyDeduplicated failed: source file does not exist: {source_p}")
@@ -226,16 +244,21 @@ def copy_files_deduplicated(sources,
     data_sizes = bvzfilesystemlib.dir_files_keyed_by_size(data_d)
     cached_md5 = dict()  # cache each md5 checksum to avoid potentially re-doing the checksum multiple times in the loop
 
-    for source_p, dest_relative_p in sources.items():
+    for copydescriptor in copydescriptors:
 
-        output[source_p] = (copy_file_deduplicated(source_p=source_p,
-                                                   dest_p=os.path.join(dest_d, dest_relative_p),
-                                                   data_d=data_d,
-                                                   data_sizes=data_sizes,
-                                                   cached_md5=cached_md5,
-                                                   ver_prefix=ver_prefix,
-                                                   num_digits=num_digits,
-                                                   do_verified_copy=do_verified_copy))
+        if not copydescriptor.link_in_place:
+            dest_p = os.path.join(dest_d, copydescriptor.dest_relative_p)
+            output[source_p] = (copy_file_deduplicated(source_p=copydescriptor.source_p,
+                                                       dest_p=dest_p,
+                                                       data_d=data_d,
+                                                       data_sizes=data_sizes,
+                                                       cached_md5=cached_md5,
+                                                       ver_prefix=ver_prefix,
+                                                       num_digits=num_digits,
+                                                       do_verified_copy=do_verified_copy))
+        else:
+            os.makedirs(os.path.split(dest_p)[0], exist_ok=True)
+            os.symlink(copydescriptor.source_p, dest_p)
 
     return output
 
@@ -335,11 +358,15 @@ def copy_file_deduplicated(source_p,
     else:
         data_file_p = matched_p
 
+    # Create the directories where the symlink will be stored.
+    os.makedirs(os.path.split(dest_p)[0], exist_ok=True)
+
     # Build a relative path from dest_p to the file the file we just copied into the data dir. Then create a symlink to
     # this file in the destination.
+    # TODO: Is this a relative path below? Looks like an absolute path to me
+    relative_p = os.path.join(data_file_p, dest_p)
     if os.path.exists(dest_p):
         os.unlink(dest_p)
-    relative_p = os.path.join(data_file_p, dest_p)
     os.symlink(relative_p, dest_p)
 
     # update the data_sizes dictionary (for performance in case we are running this function inside a loop)
