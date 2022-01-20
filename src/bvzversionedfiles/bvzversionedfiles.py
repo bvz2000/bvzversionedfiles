@@ -4,6 +4,8 @@ import shutil
 
 import bvzfilesystemlib
 
+from bvzversionedfiles.copydescriptor import Copydescriptor
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 def md5_for_file(file_p,
@@ -149,6 +151,108 @@ def copy_and_add_ver_num(source_p,
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+def single_file_to_copydescriptors(file_p,
+                                   relative_d,
+                                   dest_n,
+                                   link_in_place):
+    """
+    Given a full path to a file, returns a list of copydescriptors of length 1.
+
+    :param file_p:
+            A full path to the file being stored.
+    :param relative_d:
+            The relative path (not including the name) of where the symlinked file will live. (This is the symlink, not
+            the actual file that contains data).
+    :param dest_n:
+            The name of the symlinked file.
+    :param link_in_place:
+            If True, then each file will be set to link in place.
+
+    :return:
+            A list of copydescriptor objects of length 1.
+    """
+
+    assert type(file_p) is str
+    assert type(relative_d) is str
+    assert type(dest_n) is str
+    assert type(link_in_place) is bool
+
+    copydescriptors = list()
+
+    copydescriptor = Copydescriptor(source_p=file_p,
+                                    dest_relative_p=os.path.join(relative_d, dest_n),
+                                    link_in_place=link_in_place)
+    copydescriptors.append(copydescriptor)
+
+    return copydescriptors
+
+# ----------------------------------------------------------------------------------------------------------------------
+def file_list_to_copydescriptors(items,
+                                 relative_d,
+                                 link_in_place):
+    """
+    Given a list of files, return a list of copydescriptors.
+
+    :param items:
+            A list of files.
+    :param relative_d:
+            A relative path to the directory where the the symlinked files will be stored. If they are to be stored at 
+            the root level, this should be set to "" or None.
+    :param link_in_place:
+            If True, then each file will be set to link in place.
+
+    :return:
+            A list of copydescriptor objects.
+    """
+
+    copydescriptors = list()
+
+    if relative_d is None:
+        relative_d = ""
+
+    for item in items:
+        dest_relative_p = os.path.join(relative_d, os.path.split(item)[1])
+        copydescriptor = Copydescriptor(source_p=item,
+                                        dest_relative_p=dest_relative_p,
+                                        link_in_place=link_in_place)
+        copydescriptors.append(copydescriptor)
+
+    return copydescriptors
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def directory_to_copydescriptors(dir_d,
+                                 link_in_place):
+    """
+    Given a directory, return a list of copydescriptors.
+
+    :param dir_d:
+            A directory, all children of which will be converted to copydescriptors.
+    :param link_in_place:
+            If True, then each file will be set to link in place.
+
+    :return:
+            A list of copydescriptor objects.
+    """
+
+    copydescriptors = list()
+
+    for path, currentDirectory, files_n in os.walk(dir_d):
+        for file_n in files_n:
+            source_p = os.path.join(path, file_n)
+            dest_relative_p = source_p.split(dir_d)[1]
+            try:
+                copydescriptor = Copydescriptor(source_p=source_p,
+                                                dest_relative_p=dest_relative_p,
+                                                link_in_place=link_in_place)
+            except ValueError as e:
+                raise SquirrelError(str(e), 5000)
+            copydescriptors.append(copydescriptor)
+
+    return copydescriptors
+
+
+# ----------------------------------------------------------------------------------------------------------------------
 def copy_files_deduplicated(copydescriptors,
                             dest_d,
                             data_d,
@@ -202,9 +306,9 @@ def copy_files_deduplicated(copydescriptors,
             destination file name where the file will be stored (relative from dest_d).
     :param dest_d:
             The full path of the root directory where the files given by sources_p will appear to be copied (they will
-            appear to be copied to subdirectories of this directory, based on the relative paths given in sources_p).
-            They only "appear" to be copied to these locations because in actual fact they are symlinks to the actual
-            file which is copied into data_d.
+            appear to be copied to subdirectories of this directory, based on the relative paths given in the
+            copydescriptor). They only "appear" to be copied to these locations because in actual fact they are symlinks
+            to the actual file which is copied into data_d.
     :param data_d:
             The directory where the actual files will be stored.
     :param ver_prefix:
