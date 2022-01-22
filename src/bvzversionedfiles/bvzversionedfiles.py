@@ -351,7 +351,7 @@ def copy_files_deduplicated(copydescriptors,
 
     for copydescriptor in copydescriptors:
 
-        dest_p = os.path.join(dest_d, copydescriptor.dest_relative_p)
+        dest_p = os.path.join(dest_d, copydescriptor.dest_relative_p.lstrip(os.sep))
 
         if not copydescriptor.link_in_place:
             output[copydescriptor.source_p] = copy_file_deduplicated(source_p=copydescriptor.source_p,
